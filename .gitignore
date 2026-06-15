@@ -1,0 +1,24 @@
+# Local-only working docs (cross-chat context; never public)
+HANDOFF.md
+NEXT_CHAT_PROMPT.md
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# PlatformIO / build artifacts
+.pio/
+build/
+*.o
+*.elf
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Data dumps / generated output
+output/
+*.csv
