@@ -2,6 +2,9 @@
 HANDOFF.md
 NEXT_CHAT_PROMPT.md
 
+# Secrets (Wi-Fi credentials, broker address) - never commit; see secrets.h.example
+secrets.h
+
 # Python
 venv/
 __pycache__/
