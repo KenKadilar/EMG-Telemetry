@@ -32,6 +32,40 @@ class Biquad:
         self.y1 = self.y2 = y
 
 
+def parseBatch(payload):
+    """Parse a 'startIndex,s0,s1,...' MQTT payload into (startIndex, [samples]). None if malformed."""
+    parts = payload.split(b',')
+    if len(parts) < 2:
+        return None
+    try:
+        return int(parts[0]), [int(p) for p in parts[1:]]
+    except ValueError:
+        return None
+
+
+class GapCounter:
+    """Counts dropped samples from gaps in the batch start-index sequence."""
+    def __init__(self):
+        self.lastIndex = None
+        self.totalSampleCount = 0
+        self.dropped = 0
+
+    def update(self, startIndex, count):
+        if self.lastIndex is not None:
+            gap = startIndex - self.lastIndex - 1
+            if gap < 0 or gap > 1000:        # stream restarted (ESP32 reboot / out of order): reset
+                self.totalSampleCount = 0
+                self.dropped = 0
+            elif gap > 0:
+                self.dropped += gap
+        self.lastIndex = startIndex + count - 1
+        self.totalSampleCount += count
+
+    def lossPercent(self):
+        total = self.totalSampleCount + self.dropped
+        return 100.0 * self.dropped / total if total else 0.0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--host', default='127.0.0.1')
@@ -44,49 +78,37 @@ def main():
     args = ap.parse_args()
 
     notch = Biquad(rbj_notch(args.fs, args.mains))
-    state = {'primed': False, 'lastIndex': None, 'received': 0, 'dropped': 0, 'lastReport': 0}
+    tracker = GapCounter()
+    primed = {'done': False}
+    lastReport = {'count': 0}
 
     def onConnect(client, userdata, flags, reasonCode, properties):
         print("gateway connected (", reasonCode, "):", args.in_topic, "-> notch ->", args.out_topic)
         client.subscribe(args.in_topic)
 
     def onMessage(client, userdata, message):
-        parts = message.payload.split(b',')
-        if len(parts) < 2:
+        parsed = parseBatch(message.payload)
+        if parsed is None:
             return
-        try:
-            startIndex = int(parts[0])
-            samples = [int(p) for p in parts[1:]]
-        except ValueError:
-            return
+        startIndex, samples = parsed
 
-        last = state['lastIndex']
-        if last is not None:
-            gap = startIndex - last - 1
-            if gap < 0 or gap > 1000:          # stream restarted (ESP32 reboot / out of order): reset tracking
-                state['received'] = 0
-                state['dropped'] = 0
-                state['lastReport'] = 0
-            elif gap > 0:
-                state['dropped'] += gap
+        tracker.update(startIndex, len(samples))
 
         filteredBatch = []
         for s in samples:
-            if not state['primed']:
+            if not primed['done']:
                 notch.reset(s, s)
-                state['primed'] = True
+                primed['done'] = True
             filteredBatch.append(int(round(notch(float(s)))))
-
-        state['lastIndex'] = startIndex + len(samples) - 1
-        state['received'] += len(samples)
 
         client.publish(args.out_topic, "%d,%s" % (startIndex, ",".join(str(f) for f in filteredBatch)))
 
-        if state['received'] - state['lastReport'] >= args.report_every:
-            state['lastReport'] = state['received']
-            total = state['received'] + state['dropped']
-            loss = 100.0 * state['dropped'] / total if total else 0.0
-            print("received %d  dropped %d  (%.2f%% loss)" % (state['received'], state['dropped'], loss), flush=True)
+        if tracker.totalSampleCount < lastReport['count']:
+            lastReport['count'] = 0
+        if tracker.totalSampleCount - lastReport['count'] >= args.report_every:
+            lastReport['count'] = tracker.totalSampleCount
+            print("received %d  dropped %d  (%.2f%% loss)" % (
+                tracker.totalSampleCount, tracker.dropped, tracker.lossPercent()), flush=True)
 
     def onDisconnect(client, userdata, disconnectFlags, reasonCode, properties):
         print("disconnected (", reasonCode, "); reconnecting...", flush=True)

@@ -1,0 +1,4 @@
+-r requirements.txt
+numpy>=1.26
+pyqtgraph>=0.13
+PyQt6>=6.6

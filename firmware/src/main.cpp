@@ -9,7 +9,7 @@
 const int emgPin = 32;
 const int sampleRateHz = 200;
 const unsigned long samplePeriodUs = 1000000UL / sampleRateHz;
-const char* emgTopic = "emg/forearm";
+const char *emgTopic = "emg/forearm";
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -22,13 +22,15 @@ int sampleBuffer[batchSize];
 int bufferCount = 0;
 unsigned long batchStartIndex = 0;
 
-void connectWifi() {
+void connectWifi()
+{
   Serial.print("Wi-Fi: joining ");
   Serial.println(wifiSsid);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   WiFi.begin(wifiSsid, wifiPassword);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(300);
     Serial.print(".");
   }
@@ -36,9 +38,11 @@ void connectWifi() {
   Serial.println(WiFi.localIP());
 }
 
-IPAddress resolveBroker() {
+IPAddress resolveBroker()
+{
   IPAddress ip = MDNS.queryHost(mqttBrokerHost);
-  while ((uint32_t)ip == 0) {
+  while ((uint32_t)ip == 0)
+  {
     Serial.print("mDNS: resolving ");
     Serial.print(mqttBrokerHost);
     Serial.println(".local ...");
@@ -50,13 +54,18 @@ IPAddress resolveBroker() {
   return ip;
 }
 
-void connectMqtt() {
-  while (!mqttClient.connected()) {
+void connectMqtt()
+{
+  while (!mqttClient.connected())
+  {
     mqttClient.setServer(resolveBroker(), mqttBrokerPort);
     Serial.println("MQTT: connecting to broker");
-    if (mqttClient.connect("esp32-emg")) {
+    if (mqttClient.connect("esp32-emg"))
+    {
       Serial.println("MQTT connected");
-    } else {
+    }
+    else
+    {
       Serial.print("failed (state ");
       Serial.print(mqttClient.state());
       Serial.println("), retrying in 1s");
@@ -65,7 +74,8 @@ void connectMqtt() {
   }
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   analogReadResolution(12);
   analogSetPinAttenuation(emgPin, ADC_11db);
@@ -75,32 +85,39 @@ void setup() {
   nextSampleTime = micros();
 }
 
-void publishBatch() {
+void publishBatch()
+{
   char payload[160];
   int len = snprintf(payload, sizeof(payload), "%lu", batchStartIndex);
-  for (int k = 0; k < batchSize; k++) {
+  for (int k = 0; k < batchSize; k++)
+  {
     len += snprintf(payload + len, sizeof(payload) - len, ",%d", sampleBuffer[k]);
   }
   mqttClient.publish(emgTopic, payload);
 }
 
-void loop() {
-  if (!mqttClient.connected()) {
+void loop()
+{
+  if (!mqttClient.connected())
+  {
     connectMqtt();
   }
   mqttClient.loop();
 
-  if ((long)(micros() - nextSampleTime) >= 0) {
+  if ((long)(micros() - nextSampleTime) >= 0)
+  {
     nextSampleTime += samplePeriodUs;
 
-    if (bufferCount == 0) {
+    if (bufferCount == 0)
+    {
       batchStartIndex = sampleIndex;
     }
     sampleBuffer[bufferCount] = analogRead(emgPin);
     bufferCount++;
     sampleIndex++;
 
-    if (bufferCount >= batchSize) {
+    if (bufferCount >= batchSize)
+    {
       publishBatch();
       bufferCount = 0;
     }

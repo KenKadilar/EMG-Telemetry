@@ -1,7 +1,8 @@
 # Live scrolling graph of the EMG stream from MQTT.
 
 import os, sys, argparse
-os.environ.setdefault('PYQTGRAPH_QT_LIB', 'PyQt6')
+
+os.environ.setdefault("PYQTGRAPH_QT_LIB", "PyQt6")
 import numpy as np
 import paho.mqtt.client as mqtt
 from PyQt6 import QtWidgets, QtCore
@@ -29,7 +30,7 @@ def makeMqttClient(host, port, topic, ring):
         client.subscribe(topic)
 
     def onMessage(client, userdata, message):
-        for s in message.payload.split(b',')[1:]:
+        for s in message.payload.split(b",")[1:]:
             try:
                 ring.push(int(s))
             except ValueError:
@@ -49,18 +50,18 @@ class Monitor(QtWidgets.QMainWindow):
         self.ring = ring
         self.timeAxis = np.arange(ring.n) / fs
 
-        self.setWindowTitle('Live EMG  (over MQTT)')
-        pg.setConfigOption('background', 'w')
-        pg.setConfigOption('foreground', 'k')
+        self.setWindowTitle("Live EMG  (over MQTT)")
+        pg.setConfigOption("background", "w")
+        pg.setConfigOption("foreground", "k")
         plotWidget = pg.PlotWidget()
         self.setCentralWidget(plotWidget)
         plotWidget.setYRange(yMin, yMax)
         plotWidget.setXRange(0, seconds)
         plotWidget.disableAutoRange()
         plotWidget.showGrid(x=False, y=True, alpha=0.25)
-        plotWidget.setLabel('bottom', 'seconds')
-        plotWidget.setLabel('left', 'ADC value (0..4095)')
-        self.curve = plotWidget.plot(pen=pg.mkPen('#2980b9', width=2))
+        plotWidget.setLabel("bottom", "seconds")
+        plotWidget.setLabel("left", "ADC value (0..4095)")
+        self.curve = plotWidget.plot(pen=pg.mkPen("#2980b9", width=2))
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.updateView)
@@ -72,13 +73,13 @@ class Monitor(QtWidgets.QMainWindow):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--host', default='127.0.0.1')
-    ap.add_argument('--port', type=int, default=1883)
-    ap.add_argument('--topic', default='emg/forearm')
-    ap.add_argument('--fs', type=float, default=200.0)
-    ap.add_argument('--seconds', type=float, default=5.0)
-    ap.add_argument('--ymin', type=float, default=1000.0)
-    ap.add_argument('--ymax', type=float, default=2500.0)
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=1883)
+    ap.add_argument("--topic", default="emg/forearm/filtered")
+    ap.add_argument("--fs", type=float, default=200.0)
+    ap.add_argument("--seconds", type=float, default=5.0)
+    ap.add_argument("--ymin", type=float, default=1000.0)
+    ap.add_argument("--ymax", type=float, default=2500.0)
     args = ap.parse_args()
 
     n = int(args.fs * args.seconds)
@@ -88,6 +89,7 @@ def main():
 
     app = QtWidgets.QApplication(sys.argv)
     win = Monitor(ring, args.fs, args.seconds, args.ymin, args.ymax)
+    win.setWindowTitle("EMG: " + args.topic)
     win.resize(1000, 500)
     win.show()
     try:
@@ -97,5 +99,5 @@ def main():
         client.disconnect()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
