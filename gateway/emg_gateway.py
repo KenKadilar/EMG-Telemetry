@@ -1,7 +1,7 @@
 # Gateway service: subscribe to raw "index,sample", apply a 50 Hz notch, re-publish "index,filtered".
 # Tracks gaps in the index and reports the measured drop rate.
 
-import argparse, math
+import argparse, math, time
 import paho.mqtt.client as mqtt
 
 
@@ -82,10 +82,23 @@ def main():
             loss = 100.0 * state['dropped'] / total if total else 0.0
             print("received %d  dropped %d  (%.2f%% loss)" % (state['received'], state['dropped'], loss), flush=True)
 
+    def onDisconnect(client, userdata, disconnectFlags, reasonCode, properties):
+        print("disconnected (", reasonCode, "); reconnecting...", flush=True)
+
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = onConnect
     client.on_message = onMessage
-    client.connect(args.host, args.port, keepalive=60)
+    client.on_disconnect = onDisconnect
+    client.reconnect_delay_set(min_delay=1, max_delay=30)
+
+    while True:
+        try:
+            client.connect(args.host, args.port, keepalive=60)
+            break
+        except OSError as e:
+            print("broker not reachable (%s); retrying in 2s" % e, flush=True)
+            time.sleep(2)
+
     client.loop_forever()
 
 
