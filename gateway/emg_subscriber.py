@@ -17,14 +17,17 @@ def onConnect(client, userdata, flags, reasonCode, properties):
 
 def onMessage(client, userdata, message):
     global messageCount, receivedSample, windowStart
+    parts = message.payload.split(b',')
+    if len(parts) < 2:
+        return
     try:
-        receivedSample = int(message.payload.split(b',')[-1])
+        receivedSample = int(parts[-1])
     except ValueError:
         return
-    messageCount += 1
+    messageCount += len(parts) - 1
     now = time.time()
     if now - windowStart >= 1.0:
-        print("rate: %d msg/s   last value: %d" % (messageCount, receivedSample))
+        print("rate: %d samples/s   last value: %d" % (messageCount, receivedSample))
         messageCount = 0
         windowStart = now
 

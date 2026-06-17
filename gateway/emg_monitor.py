@@ -29,10 +29,11 @@ def makeMqttClient(host, port, topic, ring):
         client.subscribe(topic)
 
     def onMessage(client, userdata, message):
-        try:
-            ring.push(int(message.payload.split(b',')[-1]))
-        except ValueError:
-            pass
+        for s in message.payload.split(b',')[1:]:
+            try:
+                ring.push(int(s))
+            except ValueError:
+                pass
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = onConnect

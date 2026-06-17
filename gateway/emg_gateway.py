@@ -44,7 +44,7 @@ def main():
     args = ap.parse_args()
 
     notch = Biquad(rbj_notch(args.fs, args.mains))
-    state = {'primed': False, 'lastIndex': None, 'received': 0, 'dropped': 0}
+    state = {'primed': False, 'lastIndex': None, 'received': 0, 'dropped': 0, 'lastReport': 0}
 
     def onConnect(client, userdata, flags, reasonCode, properties):
         print("gateway connected (", reasonCode, "):", args.in_topic, "-> notch ->", args.out_topic)
@@ -52,32 +52,38 @@ def main():
 
     def onMessage(client, userdata, message):
         parts = message.payload.split(b',')
-        if len(parts) != 2:
+        if len(parts) < 2:
             return
         try:
-            sampleIndex = int(parts[0])
-            sample = float(int(parts[1]))
+            startIndex = int(parts[0])
+            samples = [int(p) for p in parts[1:]]
         except ValueError:
             return
 
         last = state['lastIndex']
         if last is not None:
-            gap = sampleIndex - last - 1
-            if gap < 0 or gap > 1000:
-                state['received'] = 0          # stream restarted (ESP32 reboot / out of order): reset tracking
+            gap = startIndex - last - 1
+            if gap < 0 or gap > 1000:          # stream restarted (ESP32 reboot / out of order): reset tracking
+                state['received'] = 0
                 state['dropped'] = 0
+                state['lastReport'] = 0
             elif gap > 0:
                 state['dropped'] += gap
-        state['lastIndex'] = sampleIndex
-        state['received'] += 1
 
-        if not state['primed']:
-            notch.reset(sample, sample)
-            state['primed'] = True
-        filtered = notch(sample)
-        client.publish(args.out_topic, "%d,%d" % (sampleIndex, int(round(filtered))))
+        filteredBatch = []
+        for s in samples:
+            if not state['primed']:
+                notch.reset(s, s)
+                state['primed'] = True
+            filteredBatch.append(int(round(notch(float(s)))))
 
-        if state['received'] % args.report_every == 0:
+        state['lastIndex'] = startIndex + len(samples) - 1
+        state['received'] += len(samples)
+
+        client.publish(args.out_topic, "%d,%s" % (startIndex, ",".join(str(f) for f in filteredBatch)))
+
+        if state['received'] - state['lastReport'] >= args.report_every:
+            state['lastReport'] = state['received']
             total = state['received'] + state['dropped']
             loss = 100.0 * state['dropped'] / total if total else 0.0
             print("received %d  dropped %d  (%.2f%% loss)" % (state['received'], state['dropped'], loss), flush=True)

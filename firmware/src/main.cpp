@@ -17,6 +17,11 @@ PubSubClient mqttClient(wifiClient);
 unsigned long nextSampleTime = 0;
 unsigned long sampleIndex = 0;
 
+const int batchSize = 20;
+int sampleBuffer[batchSize];
+int bufferCount = 0;
+unsigned long batchStartIndex = 0;
+
 void connectWifi() {
   Serial.print("Wi-Fi: joining ");
   Serial.println(wifiSsid);
@@ -70,6 +75,15 @@ void setup() {
   nextSampleTime = micros();
 }
 
+void publishBatch() {
+  char payload[160];
+  int len = snprintf(payload, sizeof(payload), "%lu", batchStartIndex);
+  for (int k = 0; k < batchSize; k++) {
+    len += snprintf(payload + len, sizeof(payload) - len, ",%d", sampleBuffer[k]);
+  }
+  mqttClient.publish(emgTopic, payload);
+}
+
 void loop() {
   if (!mqttClient.connected()) {
     connectMqtt();
@@ -79,11 +93,16 @@ void loop() {
   if ((long)(micros() - nextSampleTime) >= 0) {
     nextSampleTime += samplePeriodUs;
 
-    int emgValue = analogRead(emgPin);
-
-    char payload[20];
-    snprintf(payload, sizeof(payload), "%lu,%d", sampleIndex, emgValue);
-    mqttClient.publish(emgTopic, payload);
+    if (bufferCount == 0) {
+      batchStartIndex = sampleIndex;
+    }
+    sampleBuffer[bufferCount] = analogRead(emgPin);
+    bufferCount++;
     sampleIndex++;
+
+    if (bufferCount >= batchSize) {
+      publishBatch();
+      bufferCount = 0;
+    }
   }
 }
