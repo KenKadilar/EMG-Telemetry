@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <PubSubClient.h>
 #include "secrets.h"
 
@@ -30,11 +31,24 @@ void connectWifi() {
   Serial.println(WiFi.localIP());
 }
 
+IPAddress resolveBroker() {
+  IPAddress ip = MDNS.queryHost(mqttBrokerHost);
+  while ((uint32_t)ip == 0) {
+    Serial.print("mDNS: resolving ");
+    Serial.print(mqttBrokerHost);
+    Serial.println(".local ...");
+    delay(1000);
+    ip = MDNS.queryHost(mqttBrokerHost);
+  }
+  Serial.print("mDNS: broker is ");
+  Serial.println(ip);
+  return ip;
+}
+
 void connectMqtt() {
-  mqttClient.setServer(mqttBrokerIp, mqttBrokerPort);
   while (!mqttClient.connected()) {
-    Serial.print("MQTT: connecting to broker ");
-    Serial.println(mqttBrokerIp);
+    mqttClient.setServer(resolveBroker(), mqttBrokerPort);
+    Serial.println("MQTT: connecting to broker");
     if (mqttClient.connect("esp32-emg")) {
       Serial.println("MQTT connected");
     } else {
@@ -51,6 +65,7 @@ void setup() {
   analogReadResolution(12);
   analogSetPinAttenuation(emgPin, ADC_11db);
   connectWifi();
+  MDNS.begin("esp32-emg");
   connectMqtt();
   nextSampleTime = micros();
 }
