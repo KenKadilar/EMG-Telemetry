@@ -1,7 +1,8 @@
 # Gateway service: subscribe to raw "index,sample", apply a 50 Hz notch, re-publish "index,filtered".
 # Tracks gaps in the index and reports the measured drop rate.
+# Optional cloud branch: if aws_config.py is present, also forwards a decimated (~1/s) filtered sample to AWS IoT Core.
 
-import argparse, math, time
+import argparse, glob, math, os, time
 import paho.mqtt.client as mqtt
 
 
@@ -66,6 +67,29 @@ class GapCounter:
         return 100.0 * self.dropped / total if total else 0.0
 
 
+def makeAwsClient():
+    """Connect a second MQTT client to AWS IoT Core over mutual TLS. None if not configured or unreachable."""
+    try:
+        import aws_config
+    except ImportError:
+        print("cloud uplink off (no aws_config.py)", flush=True)
+        return None
+    rootCa = os.path.join(aws_config.credsDir, "AmazonRootCA1.pem")
+    certificate = glob.glob(os.path.join(aws_config.credsDir, "*-certificate.pem.crt"))[0]
+    privateKey = glob.glob(os.path.join(aws_config.credsDir, "*-private.pem.key"))[0]
+    cloud = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="emg-edge-gateway")
+    cloud.tls_set(ca_certs=rootCa, certfile=certificate, keyfile=privateKey)
+    cloud.reconnect_delay_set(min_delay=1, max_delay=30)
+    try:
+        cloud.connect(aws_config.endpoint, 8883, keepalive=60)
+    except OSError as e:
+        print("cloud uplink unreachable (%s); running local-only" % e, flush=True)
+        return None
+    cloud.loop_start()
+    print("cloud uplink on ->", aws_config.endpoint, flush=True)
+    return cloud
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--host', default='127.0.0.1')
@@ -75,12 +99,15 @@ def main():
     ap.add_argument('--fs', type=float, default=200.0)
     ap.add_argument('--mains', type=float, default=50.0, help='Canada: 60')
     ap.add_argument('--report-every', type=int, default=1000)
+    ap.add_argument('--cloud-topic', default='emg/forearm/cloud')
     args = ap.parse_args()
 
     notch = Biquad(rbj_notch(args.fs, args.mains))
     tracker = GapCounter()
     primed = {'done': False}
     lastReport = {'count': 0}
+    awsClient = makeAwsClient()
+    cloudState = {'lastPublish': 0.0}
 
     def onConnect(client, userdata, flags, reasonCode, properties):
         print("gateway connected (", reasonCode, "):", args.in_topic, "-> notch ->", args.out_topic)
@@ -102,6 +129,12 @@ def main():
             filteredBatch.append(int(round(notch(float(s)))))
 
         client.publish(args.out_topic, "%d,%s" % (startIndex, ",".join(str(f) for f in filteredBatch)))
+
+        if awsClient is not None:
+            now = time.time()
+            if now - cloudState['lastPublish'] >= 1.0:
+                cloudState['lastPublish'] = now
+                awsClient.publish(args.cloud_topic, str(filteredBatch[-1]))
 
         if tracker.totalSampleCount < lastReport['count']:
             lastReport['count'] = 0

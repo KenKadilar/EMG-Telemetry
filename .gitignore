@@ -5,6 +5,9 @@ NEXT_CHAT_PROMPT.md
 # Secrets (Wi-Fi credentials, broker address) - never commit; see secrets.h.example
 secrets.h
 
+# Cloud uplink config (AWS endpoint + path to device certs) - never commit; see aws_config.py.example
+aws_config.py
+
 # Python
 venv/
 __pycache__/

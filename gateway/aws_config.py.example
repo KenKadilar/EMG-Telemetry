@@ -1,0 +1,4 @@
+# Copy this to aws_config.py (gitignored) and fill in your values to enable the cloud uplink.
+# Without aws_config.py the gateway runs local-only.
+endpoint = "xxxxxxxxxxxxx-ats.iot.eu-central-1.amazonaws.com"
+credsDir = "/absolute/path/to/your/AWS_Credentials"
