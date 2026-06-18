@@ -2,7 +2,7 @@
 # Tracks gaps in the index and reports the measured drop rate.
 # Optional cloud branch: if aws_config.py is present, also forwards a decimated (~1/s) filtered sample to AWS IoT Core.
 
-import argparse, glob, math, os, time
+import argparse, glob, json, math, os, statistics, time
 import paho.mqtt.client as mqtt
 
 
@@ -108,6 +108,7 @@ def main():
     lastReport = {'count': 0}
     awsClient = makeAwsClient()
     cloudState = {'lastPublish': 0.0}
+    cloudWindow = []
 
     def onConnect(client, userdata, flags, reasonCode, properties):
         print("gateway connected (", reasonCode, "):", args.in_topic, "-> notch ->", args.out_topic)
@@ -131,10 +132,13 @@ def main():
         client.publish(args.out_topic, "%d,%s" % (startIndex, ",".join(str(f) for f in filteredBatch)))
 
         if awsClient is not None:
+            cloudWindow.extend(filteredBatch)
             now = time.time()
             if now - cloudState['lastPublish'] >= 1.0:
                 cloudState['lastPublish'] = now
-                awsClient.publish(args.cloud_topic, str(filteredBatch[-1]))
+                activityLevel = round(statistics.pstdev(cloudWindow), 1)
+                awsClient.publish(args.cloud_topic, json.dumps({"time": int(now), "level": activityLevel}))
+                cloudWindow.clear()
 
         if tracker.totalSampleCount < lastReport['count']:
             lastReport['count'] = 0
