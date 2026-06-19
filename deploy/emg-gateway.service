@@ -1,0 +1,16 @@
+# A+7: runs the EMG gateway as an always-on service on the Raspberry Pi. Install to /etc/systemd/system/.
+[Unit]
+Description=EMG Telemetry gateway (notch filter + AWS cloud uplink)
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/emg-gateway
+ExecStart=/home/pi/emg-gateway/venv/bin/python /home/pi/emg-gateway/emg_gateway.py
+Restart=on-failure
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
