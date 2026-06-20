@@ -4,10 +4,10 @@ A wireless biosignal telemetry system: an ESP32 reads a forearm muscle and **str
 
 **Stack:** ESP32 (Arduino / PlatformIO) | Wi-Fi + MQTT (Mosquitto) | Python gateway with a 50 Hz notch filter | Raspberry Pi 5, embedded Linux + systemd | a hand-written Linux kernel character driver | AWS IoT Core -> DynamoDB -> Lambda -> API Gateway | GitHub Actions CI + pytest
 
-<!-- INLINE VIDEO: on GitHub, edit this README in the web UI and DRAG docs/demo.mp4 into the editor right
-     here. GitHub uploads it and inserts a player link that plays inline. Keep the link line below as a fallback. -->
+<!-- DEMO VIDEO: edit this README on GitHub (web UI) and drag the compressed demo clip in right here;
+     GitHub uploads it and inserts an inline player. -->
 
-**[Watch the ~1 min demo](docs/demo.mp4)**: flex, and the live cloud dashboard and the kernel-driver readout react in sync, then a walk through the driver: kernel C, compiled, loaded, and serving the live signal at `/dev/emgactivity`.
+**Demo (~1 min):** flex, and the live cloud dashboard and the kernel-driver readout react in sync, then a walk through the driver: kernel C, compiled, loaded, and serving the live signal at `/dev/emgactivity`.
 
 ---
 
