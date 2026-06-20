@@ -35,11 +35,11 @@ The muscle drives everything; the laptop is only there to flash the ESP32 and vi
 ```mermaid
 flowchart LR
     EMG[Forearm EMG] --> ESP[ESP32<br/>ADC 200 Hz]
-    ESP --> BROKER[Mosquitto broker<br/>Raspberry Pi]
+    ESP -->|Wi-Fi / MQTT| BROKER[Mosquitto broker<br/>Raspberry Pi]
     BROKER --> GW[Python gateway<br/>50 Hz notch]
     GW --> MON[Live dashboard]
     GW --> DRV["/dev/emgactivity<br/>kernel driver"]
-    GW --> IOT[AWS IoT Core]
+    GW -->|TLS| IOT[AWS IoT Core]
     IOT --> DDB[DynamoDB] --> LAM[Lambda] --> API[API Gateway] --> WEB[Web dashboard]
 ```
 
