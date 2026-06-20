@@ -91,6 +91,17 @@ def makeAwsClient():
     return cloud
 
 
+def openActivityDevice(path="/dev/emgactivity"):
+    """Open the kernel char device for the live activity readout. None if the module is not loaded."""
+    try:
+        device = open(path, "w")
+    except OSError as e:
+        print("activity device off (%s); kernel module not loaded" % e, flush=True)
+        return None
+    print("activity device on ->", path, flush=True)
+    return device
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--host', default='127.0.0.1')
@@ -110,6 +121,7 @@ def main():
     awsClient = makeAwsClient()
     cloudState = {'lastPublish': 0.0}
     cloudWindow = deque(maxlen=200)
+    deviceState = {'file': openActivityDevice()}
 
     def onConnect(client, userdata, flags, reasonCode, properties):
         print("gateway connected (", reasonCode, "):", args.in_topic, "-> notch ->", args.out_topic)
@@ -132,13 +144,20 @@ def main():
 
         client.publish(args.out_topic, "%d,%s" % (startIndex, ",".join(str(f) for f in filteredBatch)))
 
-        if awsClient is not None:
-            cloudWindow.extend(filteredBatch)
-            now = time.time()
-            if now - cloudState['lastPublish'] >= 0.2:
-                cloudState['lastPublish'] = now
-                activityLevel = round(statistics.pstdev(cloudWindow), 1)
+        cloudWindow.extend(filteredBatch)
+        now = time.time()
+        if now - cloudState['lastPublish'] >= 0.2:
+            cloudState['lastPublish'] = now
+            activityLevel = round(statistics.pstdev(cloudWindow), 1)
+            if awsClient is not None:
                 awsClient.publish(args.cloud_topic, json.dumps({"time": round(now, 2), "level": activityLevel}))
+            if deviceState['file'] is not None:
+                try:
+                    deviceState['file'].write("%s\n" % activityLevel)
+                    deviceState['file'].flush()
+                except OSError as e:
+                    print("activity device write failed (%s); disabling" % e, flush=True)
+                    deviceState['file'] = None
 
         if tracker.totalSampleCount < lastReport['count']:
             lastReport['count'] = 0

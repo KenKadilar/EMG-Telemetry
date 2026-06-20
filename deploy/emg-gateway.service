@@ -7,6 +7,8 @@ Wants=network-online.target
 [Service]
 User=pi
 WorkingDirectory=/home/pi/emg-gateway
+# load the EMG char-device driver first (+ runs it as root, - ignores "already loaded")
+ExecStartPre=-+/usr/sbin/insmod /home/pi/emg-driver/emgactivity.ko
 ExecStart=/home/pi/emg-gateway/venv/bin/python /home/pi/emg-gateway/emg_gateway.py
 Restart=on-failure
 RestartSec=3
