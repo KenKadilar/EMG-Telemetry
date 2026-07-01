@@ -1,6 +1,4 @@
-# Gateway service: subscribe to raw "index,sample", apply a 50 Hz notch, re-publish "index,filtered".
-# Tracks gaps in the index and reports the measured drop rate.
-# Optional cloud branch: if aws_config.py is present, also forwards a decimated (~5/s) rolling activity level to AWS IoT Core.
+# Gateway service: subscribe to raw samples, apply a 50 Hz notch, re-publish, track drops, and optionally forward to AWS IoT.
 
 import argparse, glob, json, math, os, statistics, time
 from collections import deque

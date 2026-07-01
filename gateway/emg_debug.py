@@ -1,5 +1,4 @@
-# Debug tool: capture the raw EMG stream, apply the notch offline, and report what is actually in the
-# signal (drops, range, and the 50/100/150 Hz mains content before vs after the notch). Writes a CSV.
+# Debug tool: capture the raw EMG stream, apply the notch offline, and report drops/range/mains content to a CSV.
 
 import sys, time, math, argparse
 import numpy as np
